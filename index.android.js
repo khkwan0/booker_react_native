@@ -8,11 +8,16 @@ import {
   TextInput,
   Button,
   ToolbarAndroid,
-  Image
+  Image,
+  ScrollView
 } from 'react-native';
 import { StackNavigator } from 'react-navigation'
-import { Calendar, CalendarList, Agenda } from 'react-native-calendars';
+import { Calendar, CalendarList, Agenda } from 'react-native-calendars'
+import ImagePicker from 'react-native-image-crop-picker'
+
+import parseAddress from 'parse-address'
 import Config from './config.js'
+
 
 const FBSDK = require('react-native-fbsdk')
 const {
@@ -55,9 +60,6 @@ class MyToolBar extends Component {
 }
 
 class MyCalendar extends Component {
-
-
-
   constructor(props) {
     super(props)
     this.state = {
@@ -254,6 +256,252 @@ class UserLogin extends Component {
   }
 }
 
+class AddNewVenue extends Component {
+  constructor() {
+    super()
+    this.state = {
+      venueName: '',
+      address1: '',
+      address2: '',
+      zip: '',
+      desc: '',
+      cap: '',
+      email: '',
+      phone: '',
+      url: '',
+      image: '',
+      showSave: false,
+      orig: '',
+      th: '',
+      parsed: {},
+      location: {
+        type: "Point",
+        coordinates: [-118.387960, 34.090613]
+      },
+      typingTimeout: null
+    }
+    this.onChangeVenueName = this.onChangeVenueName.bind(this)
+    this.onChangeAdd1 = this.onChangeAdd1.bind(this)
+    this.onChangeAdd2 = this.onChangeAdd2.bind(this)
+    this.onChangeZip =this.onChangeZip.bind(this)
+    this.onChangeCap = this.onChangeCap.bind(this)
+    this.onChangeEmail = this.onChangeEmail.bind(this)
+    this.onChangePhone = this.onChangePhone.bind(this)
+    this.onChangeDesc = this.onChangeDesc.bind(this)
+    this.onChangeUrl = this.onChangeUrl.bind(this)
+    this.onImagePickerPress = this.onImagePickerPress.bind(this)
+    this.onSavePress = this.onSavePress.bind(this)
+    this.checkComplete = this.checkComplete.bind(this)
+    this.checkAddress = this.checkAddress.bind(this)
+  }
+
+  checkAddress(parsed) {
+    let street = parsed.street
+    let number = parsed.number
+    let zip = this.state.zip
+    if (street && number && zip) {
+      fetch(Config.dev.host+'/getlonglat?st=' + street + '&nm=' + number + '&zip' + zip,
+        method: 'GET'
+      )
+      .then((result) => { return result.json() })
+      .then((resultJson) => {
+        let coords = [];
+        coords.push(resultJson.lng);
+        coord.push(resultJson.lat);
+        this.setState({
+          location: {
+            type: "Point",
+            coordinates: coords
+          }
+        })
+      })
+      .catch((err) => {
+        alert(err)
+      })
+    }
+  }
+
+  onChangeVenueName(val) {
+    this.setState({
+      venueName: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeAdd1(val) {
+    if (this.state.typingTimeout) {
+      clearTimeout(this.state.typingTimeout)
+    }
+    let parsed =  parseAddress.parseLocation(val)
+    this.setState({
+      address1: val,
+      parsed: parsed,
+      typingTimeout: setTimeout(() => {this.checkAddress(parsed)}, 1000)
+    })
+    this.checkComplete()
+  }
+
+  onChangeAdd2(val) {
+    this.setState({
+      address2: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeZip(val) {
+    this.setState({
+      zip: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeEmail(val) {
+    this.setState({
+      email: val
+    })
+    this.checkComplete()
+  }
+
+  onChangePhone(val) {
+    this.setState({
+      phone: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeDesc(val) {
+    this.setState({
+      desc: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeCap(val) {
+    this.setState({
+      cap: val
+    })
+    this.checkComplete()
+  }
+
+  onChangeUrl(val) {
+    this.setState({
+      url: val
+    })
+    this.checkComplete()
+  }
+
+  onImagePickerPress() {
+    ImagePicker.openPicker({
+      width:300,
+      height:400
+    })
+    .then((image) => {
+      console.log(image)
+    })
+    .catch((err) => {
+      alert(err)
+    })
+  }
+
+  checkComplete() {
+    if (this.state.venueName &&
+        this.state.address1 &&
+        this.state.zip &&
+        this.state.cap &&
+        (this.state.email || this.state.phone)
+    ) {
+      this.setState({
+        showSave: true
+      })
+    } else {
+      this.setState({
+        showSave: false
+      })
+    }
+  }
+
+  onSavePress() {
+    AsyncStorage.getItem('@MySuperStore:key')
+    .then((res) => {
+      if (res) {
+        let user = JSON.parse(res)
+        toSave = {
+          user_id: user._id,
+          venueName: this.state.venueName,
+          address: this.state.address1,
+          parsed: this.state.parsed,
+          address2: this.state.address2,
+          zip: this.state.zip,
+          cap: this.state.cap,
+          image: this.state.image,
+          th: this.state.th,
+          orig: this.state.orig,
+          desc: this.state.desc,
+          phone: this.state.phone,
+          email: this.state.email,
+          location: this.state.location,
+        }
+        fetch(Config.dev.host + '/savevenue',
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(toSave)
+          }
+        )
+        .then((result) => {
+          return result.json()
+        })
+        .then((resultJson) => {
+          if (resultJson) {
+            this.props.handleAddNewVenue(resultJson.venue)
+            this.props.cancel()
+          }
+        })
+        .catch((err) => {
+          alert(err)
+        })
+      }
+    })
+    .catch((err) => {
+      alert(err)
+    })
+  }
+
+  render() {
+    return (
+      <View>
+        <TextInput onChangeText={this.onChangeVenueName} value={this.state.venueName} placeholder="Venue Name"/>
+        <TextInput onChangeText={this.onChangeAdd1} value={this.state.address1} placeholder="Street Address" />
+        <TextInput onChangeText={this.onChangeAdd2} value={this.state.address2} placeholder="Street Address 2 (optional)"/>
+        <TextInput onChangeText={this.onChangeZip} value={this.state.zip} placeholder="Zip" />
+        <TextInput onChangeText={this.onChangeCap} value={this.state.cap.toString()} placeholder="Capacity" />
+        <TextInput onChangeText={this.onChangeDesc} value={this.state.desc} placeholder="Decscribe your venue (optional)" />
+        <TextInput onChangeText={this.onChangeEmail} value={this.state.email} placeholder="Contact Email" />
+        <TextInput onChangeText={this.onChangePhone} value={this.state.phone} placeholder="Contact Phone" />
+        <TextInput onChangeText={this.onChangeUrl} value={this.state.url} placeholder="Web page URL Address (optional)" />
+        <View style={{flexDirection: 'row', justifyContent: 'center', alignItems:'center'}}>
+          <View style={{width:'30%'}}>
+            <Button onPress={this.onImagePickerPress} title="Add images" />
+          </View>
+          { this.state.showSave &&
+            <View style={{paddingLeft:'1%', width: '20%'}}>
+              <Button onPress={this.onSavePress} title="Save" />
+            </View>
+          }
+          <View style={{paddingLeft: '1%', width: '20%'}}>
+            <Button onPress={this.props.cancel} title="Cancel" />
+          </View>
+        </View>
+
+      </View>
+    )
+  }
+}
+
 class Venues extends Component {
 
   constructor() {
@@ -263,6 +511,7 @@ class Venues extends Component {
     }
     this.handleAddVenueClick = this.handleAddVenueClick.bind(this)
     this.navigateToCalendar = this.navigateToCalendar.bind(this)
+    this.doCancel = this.doCancel.bind(this)
   }
 
   static navigationOptions = {
@@ -275,6 +524,12 @@ class Venues extends Component {
     })
   }
 
+  doCancel() {
+    this.setState({
+      showAddVenue: false
+    })
+  }
+
   navigateToCalendar(venue) {
     //alert(JSON.stringify(venue, null, 1))
     this.props.navigation.navigate('Calendar', {user: this.props.navigation.state.params.user, venue:venue})
@@ -283,13 +538,13 @@ class Venues extends Component {
   render() {
     const { params } = this.props.navigation.state;
     return (
-      <View style={{backgroundColor:'#ffb875',height:'100%'}}>
+      <ScrollView style={{backgroundColor:'#ffb875',height:'100%'}}>
         <View>
           <Button title="Add Venue" onPress={this.handleAddVenueClick} />
         </View>
         {this.state.showAddVenue &&
           <View>
-            <Text>If you own a venue, then this is the place to register your venue(s)</Text>
+            <AddNewVenue cancel={this.doCancel} handleAddNewVenue={params.handleAddNewVenue} />
           </View>
         }
         {params.user.venues &&
@@ -304,14 +559,13 @@ class Venues extends Component {
                 <Text>{venue.desc}</Text>
                 <Text>Contact Phone {venue.phone}</Text>
                 <Text>Contact Email {venue.email}</Text>
-                {venue.verifed?<Text style={{color:'green'}}>Verified</Text>:<Text style={{color:'red'}}>Unverified</Text>}
+                {venue.verified?<Text style={{color:'green'}}>Verified</Text>:<Text style={{color:'red'}}>Unverified</Text>}
                 <Button title="Calendar" onPress={() => this.navigateToCalendar(venue)} />
-
               </View>
             )
           })
         }
-      </View>
+      </ScrollView>
     )
   }
 }
@@ -338,6 +592,7 @@ class Home extends Component {
     this.getZip = this.getZip.bind(this)
     this.saveZip = this.saveZip.bind(this)
     this.editZip = this.editZip.bind(this)
+    this.handleAddNewVenue = this.handleAddNewVenue.bind(this)
   }
 
   componentDidMount() {
@@ -401,6 +656,27 @@ class Home extends Component {
     }
   }
 
+  handleAddNewVenue(venue) {
+    let user = this.state.user
+    if (typeof user.venues === 'undefined') {
+      user.venues = []
+      user.hasVenue = 0
+      user.vwants = 0
+    }
+    user.venues.push(venue)
+    user.hasVenue = user.hasVenue + 1
+    this.setState({
+      user: user
+    })
+    AsyncStorage.setItem('@MySuperStore:key', JSON.stringify(user))
+    .then((result) => {
+
+    })
+    .catch((err) => {
+      alert(err)
+    })
+  }
+
   getZip(user) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -461,7 +737,7 @@ class Home extends Component {
   }
 
   navigateToVenues() {
-    this.props.navigation.navigate('Venues', {user: this.state.user})
+    this.props.navigation.navigate('Venues', {user: this.state.user, handleAddNewVenue: this.handleAddNewVenue})
   }
 
   render() {
@@ -506,7 +782,7 @@ class Home extends Component {
                   onPress={this.navigateToVenues}
                   title={buttonTitle}
                 />
-                <Text>There are {this.state.user.vwants.length} venues accumulating fans</Text>
+                <Text>You have {this.state.user.vwants.length} venues accumulating fans</Text>
               </View>
             }
           </View>
@@ -515,6 +791,7 @@ class Home extends Component {
     )
   }
 }
+
 const App = StackNavigator({
   Home: {
     screen: Home,

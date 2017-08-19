@@ -7,10 +7,12 @@
 		"test": "jest"
 	},
 	"dependencies": {
+		"parse-address": "0.0.7",
 		"react": "16.0.0-alpha.12",
 		"react-native": "0.47.1",
 		"react-native-calendars": "^1.5.6",
 		"react-native-fbsdk": "^0.6.1",
+		"react-native-image-crop-picker": "^0.15.1",
 		"react-navigation": "^1.0.0-beta.11"
 	},
 	"devDependencies": {
