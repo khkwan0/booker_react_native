@@ -36,11 +36,14 @@ class MyToolBar extends Component {
   }
 
   handleAction(position) {
-    if (position === 2) {
-      this.props.doLogout();
+    if (position === 3) {
+      this.props.doLogout()
     }
     if (position === 1) {
-      this.props.gotoVenue();
+      this.props.gotoVenue()
+    }
+    if (position === 2) {
+      this.props.gotoArtist()
     }
   }
   render() {
@@ -50,6 +53,7 @@ class MyToolBar extends Component {
           [
             {title: this.props.user.uname},
             {title: 'Venues'},
+            {title: 'Artist'},
             {title: 'Logout'}
           ]
         }
@@ -64,7 +68,7 @@ class MyCalendar extends Component {
     super(props)
     this.state = {
       dates: [],
-      refid: props.navigation.state.params.venue._id
+      refid: props.navigation.state.params.entity._id
     }
     this.handleDayPress = this.handleDayPress.bind(this)
     this.saveAvail = this.saveAvail.bind(this)
@@ -496,7 +500,6 @@ class AddNewVenue extends Component {
             <Button onPress={this.props.cancel} title="Cancel" />
           </View>
         </View>
-
       </View>
     )
   }
@@ -532,7 +535,7 @@ class Venues extends Component {
 
   navigateToCalendar(venue) {
     //alert(JSON.stringify(venue, null, 1))
-    this.props.navigation.navigate('Calendar', {user: this.props.navigation.state.params.user, venue:venue})
+    this.props.navigation.navigate('Calendar', {user: this.props.navigation.state.params.user, entity:venue})
   }
 
   render() {
@@ -569,6 +572,205 @@ class Venues extends Component {
     )
   }
 }
+
+class AddNewArtist extends Component {
+  constructor() {
+    super()
+    this.state = {
+      artistName: '',
+      desc:'',
+      location: {
+        type: "Point",
+        coordinates: []
+      },
+      zip: '',
+      phone: '',
+      email: '',
+      isComplete: false,
+      genre: ''
+    }
+    this.onChangeName = this.onChangeName.bind(this)
+    this.onChangeDesc = this.onChangeDesc.bind(this)
+    this.onChangeZip = this.onChangeZip.bind(this)
+    this.onChangeEmail = this.onChangeEmail.bind(this)
+    this.onChangePhone = this.onChangePhone.bind(this)
+    this.checkComplete = this.checkComplete.bind(this)
+    this.doSaveArtist = this.doSaveArtist.bind(this)
+  }
+
+  checkComplete() {
+    if (this.state.artistName && this.state.zip && (this.state.phone || this.state.email)) {
+      this.setState({
+        isComplete: true
+      })
+    }
+  }
+
+  doSaveArtist() {
+    AsyncStorage.getItem('@MySuperStore:key')
+    .then((res) => {
+      if (res) {
+        let user = JSON.parse(res)
+        let toSave = {
+          user_id: user._id,
+          artist_name: this.state.artistName,
+          genre: this.state.genre,
+          phone: this.state.phone,
+          email: this.state.email,
+          web_page: this.state.url,
+          desc: this.state.desc,
+          zip: this.state.zip,
+          location: this.state.location
+        }
+        fetch(Config.dev.host+'/saveartist',
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(toSave)
+          }
+        )
+        .then((result) => { return result.json() })
+        .then((resultJson) => {
+          this.props.handleArtistSave(resultJson.msg)
+          this.props.cancel()
+        })
+        .catch((err) => {
+          alert(err)
+        })
+      }
+    })
+    .catch((err) => {
+      alert(err)
+    })
+  }
+
+  onChangeName(e) {
+    this.setState({
+      artistName: e
+    })
+    this.checkComplete()
+  }
+
+  onChangeDesc(e) {
+    this.setState({
+      desc: e
+    })
+    this.checkComplete()
+  }
+
+  onChangeZip(e) {
+    this.setState({
+      zip: e
+    })
+    this.checkComplete()
+  }
+
+  onChangeEmail(e) {
+    this.setState({
+      email: e
+    })
+    this.checkComplete()
+  }
+
+  onChangePhone(e) {
+    this.setState({
+      phone: e
+    })
+    this.checkComplete()
+      }
+
+  onChangeUrl(e) {
+    this.setState({
+      url: e
+    })
+    this.checkComplete()
+  }
+
+  render() {
+    return(
+      <View>
+        <TextInput onChangeText={this.onChangeName} value={this.state.artistName} placeholder="(Required) Your group/band/artist's name" />
+        <TextInput onChangeText={this.onChangeGenre} value={this.state.genre} placeholder="(optonal) Genre" />
+        <TextInput onChangeText={this.onChangeDesc} value={this.state.desc} placeholder="(optional) Describe {this.state.artistName}" />
+        <TextInput onChangeText={this.onChangeZip} value={this.state.zip} placeholder="(Required) Origin Zip code for {this.state.artistName}" />
+        <TextInput onChangeText={this.onChangeEmail} value={this.state.email} placeholder="(Required) Contact Email" />
+        <TextInput onChangeText={this.onChangePhone} value={this.state.phone} placeholder="(Required IF no email) Contact Phone" />
+        <TextInput onChangeText={this.onChangeUrl} value={this.state.url} placeholder="(optional) http(s)://..." />
+        <Button title="Cancel" onPress={this.props.cancel} />
+        {this.state.isComplete &&
+          <Button title="Save" onPress={this.doSaveArtist} />
+        }
+      </View>
+    )
+  }
+}
+
+class Artists extends Component {
+
+  static navigationOptions = {
+    title: 'Your Artists',
+  };
+
+  constructor() {
+    super()
+    this.state = {
+      showAddArtist: false
+    }
+    this.doCancel = this.doCancel.bind(this)
+    this.onAddNewArtist = this.onAddNewArtist.bind(this)
+    this.navigateToCalendar = this.navigateToCalendar.bind(this)
+  }
+
+  doCancel() {
+    this.setState({
+      showAddArtist: false
+    })
+  }
+
+  onAddNewArtist() {
+    this.setState({
+      showAddArtist: true
+    })
+  }
+
+  navigateToCalendar(artist) {
+    this.props.navigation.navigate('ArtistCalendar', {user: this.props.navigation.state.params.user, entity:artist})
+  }
+
+  render() {
+    const { params } = this.props.navigation.state
+    return (
+      <ScrollView>
+        <Button onPress={this.onAddNewArtist} title="Add artist" />
+        {this.state.showAddArtist &&
+          <View>
+            <AddNewArtist cancel={this.doCancel} handleArtistSave={params.handleAddNewArtist} />
+          </View>
+        }
+        {params.user.artists &&
+          params.user.artists.map((_artist) => {
+            let artist = JSON.parse(_artist)
+            return (
+              <View key={artist._id} style={{backgroundColor:'#ffc68f',marginTop:'2%',marginBottom:'2%',paddingLeft:'2%',paddingRight:'2%'}}>
+                <Text style={{fontWeight:'bold'}}>{artist.artist_name}</Text>
+                <Text>Genre: {artist.genre}</Text>
+                <Text>Description: {artist.desc}</Text>
+                <Text>Contact Phone {artist.phone}</Text>
+                <Text>Contact Email {artist.email}</Text>
+                <Button title="Calendar" onPress={() => this.navigateToCalendar(artist)} />
+              </View>
+            )
+          })
+        }
+      </ScrollView>
+    )
+  }
+}
+
 class Home extends Component {
 
   static navigationOptions = {
@@ -593,6 +795,8 @@ class Home extends Component {
     this.saveZip = this.saveZip.bind(this)
     this.editZip = this.editZip.bind(this)
     this.handleAddNewVenue = this.handleAddNewVenue.bind(this)
+    this.handleAddNewArtist = this.handleAddNewArtist.bind(this)
+    this.navigateToArtists = this.navigateToArtists.bind(this)
   }
 
   componentDidMount() {
@@ -654,6 +858,26 @@ class Home extends Component {
     if (typeof this.state.user.fbid !== 'undefined') {
       LoginManager.logOut()
     }
+  }
+
+  handleAddNewArtist(artist) {
+    let user = this.state.user
+    if (typeof user.artists === 'undefined') {
+      user.artists = []
+      user.hasArtist = 0
+    }
+    user.artists.push(artist)
+    user.hasArtist = user.hasArtist + 1
+    this.setState({
+      user: user
+    })
+    AsyncStorage.setItem('@MySuperStore:key', JSON.stringify(user))
+    .then((result) => {
+
+    })
+    .catch((err) => {
+      alert(err)
+    })
   }
 
   handleAddNewVenue(venue) {
@@ -740,10 +964,17 @@ class Home extends Component {
     this.props.navigation.navigate('Venues', {user: this.state.user, handleAddNewVenue: this.handleAddNewVenue})
   }
 
+  navigateToArtists() {
+    this.props.navigation.navigate('Artists', {user: this.state.user, handleAddNewArtist: this.handleAddNewArtist})
+  }
+
   render() {
     let buttonTitle = ''
     if (this.state.user && this.state.user.hasVenue) {
       buttonTitle = "You have "+this.state.user.hasVenue+" venues"
+    }
+    if (this.state.user && this.state.user.hasArtist) {
+      artistButtonTitle = "You have "+this.state.user.hasArtist+" artist"
     }
     return (
       <View style={styles.container}>
@@ -754,7 +985,7 @@ class Home extends Component {
         }
         {this.state.user &&
           <View>
-            <MyToolBar user={this.state.user} doLogout={this.handleLogout} gotoVenue={this.navigateToVenues} />
+            <MyToolBar user={this.state.user} doLogout={this.handleLogout} gotoVenue={this.navigateToVenues} gotoArtist={this.navigateToArtists}/>
             <Text style={styles.welcome}>
               Welcome {this.state.user.uname}
             </Text>
@@ -785,6 +1016,14 @@ class Home extends Component {
                 <Text>You have {this.state.user.vwants.length} venues accumulating fans</Text>
               </View>
             }
+            {this.state.user.hasArtist &&
+              <View>
+                <Button
+                  onPress={this.navigateToArtists}
+                  title={artistButtonTitle}
+                />
+              </View>
+            }
           </View>
         }
       </View>
@@ -794,15 +1033,24 @@ class Home extends Component {
 
 const App = StackNavigator({
   Home: {
-    screen: Home,
+    screen: Home
   },
   Venues: {
-    screen: Venues,
+    screen: Venues
+  },
+  Artists: {
+    screen: Artists
   },
   Calendar: {
     screen: MyCalendar,
     navigationOptions: ({navigation}) => ({
-      title: `${navigation.state.params.venue.venueName}`
+      title: `${navigation.state.params.entity.venueName}`
+    })
+  },
+  ArtistCalendar: {
+    screen: MyCalendar,
+    navigationOptions: ({navigation}) => ({
+      title: `${navigation.state.params.entity.artist_name}`
     })
   }
 })
